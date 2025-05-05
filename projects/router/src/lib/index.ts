@@ -251,6 +251,8 @@ export {
   createLazyRoute,
 } from './file-route';
 export {
+  ERROR_COMPONENT_CONTEXT,
+  NOT_FOUND_COMPONENT_CONTEXT,
   NotFoundRoute,
   RootRoute,
   Route,
@@ -292,6 +294,7 @@ export { routerState, routerState$ } from './router-state';
 
 export { isNotFound, notFound } from '@tanstack/router-core';
 export type { NotFoundError } from '@tanstack/router-core';
+export { DefaultError } from './default-error';
 export { DefaultNotFound } from './default-not-found';
 
 export type { ValidateLinkOptions, ValidateLinkOptionsArray } from './link';

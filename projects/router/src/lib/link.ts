@@ -1,7 +1,7 @@
 import {
+  afterRenderEffect,
   computed,
   Directive,
-  effect,
   ElementRef,
   inject,
   input,
@@ -38,7 +38,7 @@ import { routerState, routerState$ } from './router-state';
     '(touchstart)': 'handleClick($event)',
     '(mouseenter)': 'handleMouseEnter($event)',
     '(mouseleave)': 'handleMouseLeave()',
-    '[class]': '[isActive() ? activeClass() : ""]',
+    '[class]': 'activeClass()',
     '[attr.data-active]': 'isActive()',
     '[attr.data-type]': 'type()',
     '[attr.data-transitioning]':
@@ -47,6 +47,7 @@ import { routerState, routerState$ } from './router-state';
     '[attr.role]': 'disabled() ? "link" : undefined',
     '[attr.aria-disabled]': 'disabled()',
     '[attr.aria-current]': 'isActive() ? "page" : undefined',
+    '[attr.data-from]': 'from()',
   },
 })
 export class Link {
@@ -104,12 +105,6 @@ export class Link {
   private includeSearchActiveOptions = computed(
     () => this.activeOptions().includeSearch
   );
-  private explicitUndefinedActiveOptions = computed(
-    () => this.activeOptions().explicitUndefined
-  );
-  protected activeClass = computed(
-    () => this.activeOptions().class || 'active'
-  );
 
   protected type = computed(() => {
     const to = this.to();
@@ -123,7 +118,7 @@ export class Link {
 
   // when `from` is not supplied, use the leaf route of the current matches as the `from` location
   // so relative routing works as expected
-  private from = toSignal(
+  protected from = toSignal(
     combineLatest([
       toObservable(this.userFrom),
       matches$({ select: (matches) => matches[matches.length - 1]?.fullPath }),
@@ -233,9 +228,12 @@ export class Link {
       )
     )
   );
+  protected activeClass = computed(() =>
+    this.isActive() ? this.activeOptions().class || 'active' : ''
+  );
 
   constructor() {
-    effect(() => {
+    afterRenderEffect(() => {
       const [disabled, preload] = [
         untracked(this.disabled),
         untracked(this.preload),
@@ -245,7 +243,7 @@ export class Link {
       }
     });
 
-    effect((onCleanup) => {
+    afterRenderEffect((onCleanup) => {
       const unsub = this.router.subscribe('onResolved', () => {
         this.transitioning.set(false);
       });

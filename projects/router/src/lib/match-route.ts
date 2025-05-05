@@ -1,15 +1,11 @@
 import {
-  afterNextRender,
   assertInInjectionContext,
-  DestroyRef,
+  computed,
   Directive,
-  EmbeddedViewRef,
   inject,
   Injector,
   input,
   runInInjectionContext,
-  TemplateRef,
-  ViewContainerRef,
 } from '@angular/core';
 import { toObservable, toSignal } from '@angular/core/rxjs-interop';
 import {
@@ -22,7 +18,8 @@ import {
   MatchRouteOptions as TanstackMatchRouteOptions,
   ToSubOptionsProps,
 } from '@tanstack/router-core';
-import { combineLatest, map, Subscription, switchMap } from 'rxjs';
+import { combineLatest, map, switchMap } from 'rxjs';
+import { Link } from './link';
 import { injectRouter } from './router';
 import { routerState$ } from './router-state';
 
@@ -106,7 +103,7 @@ export type MakeMatchRouteOptions<
   TMaskTo extends string = '',
 > = MatchRouteOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>;
 
-@Directive({ selector: 'ng-template[matchRoute]' })
+@Directive({ selector: '[match]', exportAs: 'matchRoute' })
 export class MatchRoute<
   TRouter extends AnyRouter = RegisteredRouter,
   const TFrom extends string = string,
@@ -114,56 +111,22 @@ export class MatchRoute<
   const TMaskFrom extends string = TFrom,
   const TMaskTo extends string = '',
 > {
-  matchRoute =
-    input.required<
-      MakeMatchRouteOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>
-    >();
+  matchRoute = input<
+    Partial<MakeMatchRouteOptions<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>>
+  >({}, { alias: 'match' });
 
   private status$ = routerState$({ select: (s) => s.status });
-  private matchRouteFn = matchRoute$();
-  private params$ = toObservable(this.matchRoute).pipe(
-    switchMap((matchRoute) => this.matchRouteFn(matchRoute as any))
+  private matchRouteFn = matchRoute$<TRouter>();
+
+  private parentLink = inject(Link, { optional: true });
+  private options = computed(() => {
+    const parentLinkOptions = this.parentLink?.linkOptions();
+    if (!parentLinkOptions) return this.matchRoute();
+    return { ...parentLinkOptions, ...this.matchRoute() };
+  });
+
+  match$ = combineLatest([toObservable(this.options), this.status$]).pipe(
+    switchMap(([matchRoute]) => this.matchRouteFn(matchRoute as any))
   );
-
-  private vcr = inject(ViewContainerRef);
-  private templateRef = inject(TemplateRef);
-
-  private ref?: EmbeddedViewRef<any>;
-
-  constructor() {
-    let subscription: Subscription;
-    afterNextRender(() => {
-      subscription = combineLatest([this.params$, this.status$]).subscribe(
-        ([params]) => {
-          if (this.ref) {
-            this.ref.destroy();
-          }
-
-          this.ref = this.vcr.createEmbeddedView(this.templateRef, {
-            match: params,
-          });
-          this.ref.markForCheck();
-        }
-      );
-    });
-
-    inject(DestroyRef).onDestroy(() => {
-      subscription?.unsubscribe();
-      this.vcr.clear();
-      this.ref?.destroy();
-    });
-  }
-
-  static ngTemplateContextGuard<
-    TRouter extends AnyRouter = RegisteredRouter,
-    const TFrom extends string = string,
-    const TTo extends string | undefined = undefined,
-    const TMaskFrom extends string = TFrom,
-    const TMaskTo extends string = '',
-  >(
-    _: MatchRoute<TRouter, TFrom, TTo, TMaskFrom, TMaskTo>,
-    ctx: unknown
-  ): ctx is { match: boolean } {
-    return true;
-  }
+  match = toSignal(this.match$);
 }

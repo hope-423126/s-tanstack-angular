@@ -85,7 +85,6 @@ export class OnRendered {
 }
 
 export const MATCH_ID = new InjectionToken<string>('MATCH_ID');
-export const MATCH_IDS = new InjectionToken<string[]>('MATCH_IDS');
 
 @Component({
   selector: 'route-match,RouteMatch',
@@ -306,7 +305,6 @@ export class RouteMatch {
             const successComponent = route.options.component?.() || Outlet;
 
             if (this.cmp === successComponent) {
-              this.cmpRef?.changeDetectorRef.markForCheck();
               return of({ clearView: false } as const);
             }
 
@@ -326,13 +324,7 @@ export class RouteMatch {
             return of({
               component: successComponent,
               injector: Injector.create({
-                providers: [
-                  { provide: MATCH_ID, useValue: match.id },
-                  {
-                    provide: MATCH_IDS,
-                    useValue: [match.id, this.matchId(), route.id],
-                  },
-                ],
+                providers: [{ provide: MATCH_ID, useValue: match.id }],
                 parent: injector,
               }),
               environmentInjector,
@@ -403,7 +395,6 @@ export class RouteMatch {
 })
 export class Outlet {
   private matchId = inject(MATCH_ID);
-  private matchIds = inject(MATCH_IDS);
   private router = injectRouter();
   private vcr = inject(ViewContainerRef);
   private isDevMode = isDevMode();
@@ -424,7 +415,6 @@ export class Outlet {
   );
   private parentGlobalNotFound$ = this.matches$.pipe(
     map((matches) => {
-      console.log(this.vcr.element.nativeElement, { matchIds: this.matchIds });
       const parentMatch = matches.find((d) => d.id === this.matchId);
       if (!parentMatch) {
         warning(
@@ -484,6 +474,7 @@ export class Outlet {
 
             if (!notFoundCmp) return null;
 
+            this.renderedId = route.id + '-not-found';
             const injector = this.router.getRouteInjector(
               route.id + '-not-found',
               this.vcr.injector,
